@@ -1,0 +1,94 @@
+#!/bin/bash
+
+SOURCE="https://mirror.tuna.tsinghua.edu.cn/ubuntu/pool/main/g/glibc"
+# Use the source below if you feel slow, or change it on your own.
+# SOURCE="http://archive.ubuntu.com/ubuntu/pool/main/g/glibc/"
+
+LIBC_PREFIX="libc6_"
+LIBC_DBG_PREFIX="libc6-dbg_"
+
+die() {
+  echo >&2 $1
+  exit 1
+}
+
+usage() {
+  echo >&2 "Usage: $0 id"
+  exit 2
+}
+
+
+
+extract() {
+    local deb=$1
+    local out=$2
+    if [ ! -d "$out" ]; then
+        mkdir $out
+    fi
+    local tmp=`mktemp -d`
+    cp $deb $tmp/pkg.deb
+    pushd $tmp 1>/dev/null
+    ar x pkg.deb || die "ar failed"
+    tar xf data.tar.* || die "tar failed"
+    popd 1>/dev/null
+    
+    cp $tmp/lib/*/* $out 2>/dev/null || cp $tmp/lib32/* $out 2>/dev/null \
+      || cp $tmp/usr/lib/debug/lib/*/* $out 2>/dev/null || cp $tmp/usr/lib/debug/lib32/* $out 2>/dev/null \
+      || die "Failed to save. Check it manually $tmp"
+    
+    rm -rf $tmp
+}
+
+download() {
+  local id=$1
+  local deb_name=$LIBC_PREFIX$id.deb
+  local dbg_name=$LIBC_DBG_PREFIX$id.deb
+  echo "Getting $id"
+  if [ -d "libs/$id" ]; then
+    die "  --> Downloaded before. Remove it to download again."
+  fi
+
+  mkdir debs
+  # download binary package
+  local url="$SOURCE/$deb_name"
+  echo "  -> Binary location: $url"
+  echo "  -> Downloading libc binary package"
+  wget "$url" 2>/dev/null -O debs/$deb_name || die "Failed to download package from $url"
+  echo "  -> Extracting libc binary package"
+
+  mkdir libc
+  extract debs/$deb_name libc
+  echo "  -> Package saved to libs/$id"
+
+  # download debug info package
+  local url="$SOURCE/$dbg_name"
+  echo "  -> Debug location: $url"
+  echo "  -> Downloading libc debug package"
+  wget "$url" 2>/dev/null -O debs/$dbg_name || die "Failed to download package from $url"
+  echo "  -> Extracting libc debug package"
+
+  mkdir .debug
+  extract debs/$dbg_name .debug
+  echo "  -> Saved debugfiles to saved to .debug"
+
+  rm -rf debs
+}
+
+patchfile() {
+  echo "  -> Patching ELF file"
+  patchelf --set-interpreter ./libc/ld-$release_id.so ./$patchfile
+  patchelf --set-rpath ./libc/ ./$patchfile
+  echo "  -> Patched ELF file with downloaded libc"
+  exit 2
+}
+if [[ $# != 2 ]]; then
+  usage
+fi
+
+patchfile="$(echo $2)"
+release_id="$(echo $1 | cut -d'-' -f1)"
+download "$1"
+patchfile
+
+echo "  -> Done..."
+echo "  -> Now run your executable with libc: $release_id"
