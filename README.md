@@ -1,10 +1,9 @@
-# run-with-libc
+# libcpatch
 Download, unpack, patch, and run ELF files with custom libc together with ld and debug symbols
 
 
 ### Usage:
-`./patchfile 2.23-0ubuntu11_amd64 ./chapter1`
-
+`./libcpatch 2.23-0ubuntu11_amd64 ./chapter1`
 
 ### Supported libc versions:
 ```
