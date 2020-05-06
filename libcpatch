@@ -72,6 +72,7 @@ download() {
   echo "  -> Saved debugfiles to saved to .debug"
 
   rm -rf debs
+  mv .debug libc/
 }
 
 patchfile() {
